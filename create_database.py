@@ -1,5 +1,7 @@
 """Script for database creation"""
 from psycopg2 import connect, errorcodes, OperationalError
+from psycopg2.errors import DuplicateDatabase, DuplicateTable
+
 
 CREATE_DB = """CREATE DATABASE msg_server_db;"""
 
@@ -30,39 +32,35 @@ HOST = "localhost"
 PASSWORD = "asdf11"
 
 try:
-    cnx = connect(user=USER, host=HOST, password=PASSWORD)
+    cnx = connect(user=USER, password=PASSWORD, host=HOST)
     cnx.autocommit = True
-
     cursor = cnx.cursor()
     try:
         cursor.execute(CREATE_DB)
         print("Database created")
-    except OperationalError as e:
-        if e.pgcode == errorcodes.DUPLICATE_DATABASE:
-            print("Database already exists - stage skipped")
+    except DuplicateDatabase as e:
+        print("Database exists ", e)
     cnx.close()
 except OperationalError as e:
-    print("Connection error, try again: ", e)
+    print("Connection Error: ", e)
+
 
 try:
-    cnx = connect(user=USER, host=HOST, password=PASSWORD, database="msg_server_db")
+    cnx = connect(database="msg_server_db", user=USER, password=PASSWORD, host=HOST)
     cnx.autocommit = True
-
     cursor = cnx.cursor()
+
     try:
         cursor.execute(USERS_TABLE)
-        print("Table Users created")
-    except OperationalError as e:
-        if e.pgcode == errorcodes.DUPLICATE_TABLE:
-            print("Table already exists - stage skipped")
-            pass
+        print("Table users created")
+    except DuplicateTable as e:
+        print("Table exists ", e)
+
     try:
         cursor.execute(MSG_TABLE)
-        print("Table Messages created")
-    except OperationalError as e:
-        if e.pgcode == errorcodes.DUPLICATE_TABLE:
-            print("Table already exists - stage skipped")
-            pass
+        print("Table messages created")
+    except DuplicateTable as e:
+        print("Table exists ", e)
     cnx.close()
 except OperationalError as e:
-    print("Connection error, try again: ", e)
+    print("Connection Error: ", e)

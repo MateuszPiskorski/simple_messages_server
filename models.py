@@ -1,9 +1,8 @@
 from clcrypto import hash_password
-from psycopg2 import connect, OperationalError
 
 
 class User:
-    def __init__(self, username="", password="", salt=""):
+    def __init__(self, username="", password="", salt=None):
         self._id = -1
         self.username = username
         self._hashed_password = hash_password(password, salt)
@@ -84,44 +83,49 @@ class User:
 
 
 class Message:
-    def __init__(self, from_id="", to_id="", text="", creation_date=None):
+    def __init__(self, from_id, to_id, text):
         self._id = -1
-        self._from_id = from_id
-        self._to_id = to_id
+        self.from_id = from_id
+        self.to_id = to_id
         self.text = text
-        self.creation_date = creation_date
+        self._creation_date = None
 
     @property
     def id(self):
         return self._id
 
+    @property
+    def creation_date(self):
+        return self._creation_date
+
     def save_to_db(self, cursor):
         if self._id == -1:
-            sql = """INSERT INTO Messages(from_id, to_id, creation_date, text)
-                            VALUES(%s, %s, CURRENT_TIMESTAMP, %s) RETURNING id;"""
-            values = (self._from_id, self._to_id, self.creation_date, self.text)
+            sql = """INSERT INTO Messages(from_id, to_id, text)
+                            VALUES(%s, %s, %s) RETURNING id, creation_date;"""
+            values = (self.from_id, self.to_id, self.text)
             cursor.execute(sql, values)
-            self._id = cursor.fetchone()[0]  # or cursor.fetchone()['id']
+            self._id, self._creation_date = cursor.fetchone()
             return True
         else:
-            sql = """UPDATE Messages SET from_id=%s, to_id=%s, creation_date=CURRENT_TIMESTAMP, text=self.text
+            sql = """UPDATE Messages SET from_id=%s, to_id=%s, text=%s
                            WHERE id=%s;"""
-            values = (self._from_id, self._to_id, self.creation_date, self.text, self.id)
+            values = (self.from_id, self.to_id, self.text, self.id)
             cursor.execute(sql, values)
             return True
 
     @staticmethod
-    def load_all_messages(cursor):
-        sql = "SELECT id, from_id, to_id, creation_date, text FROM Users;"
+    def load_all_messages(cursor, user_id=None):
+        if user_id:
+            sql = "SELECT id, from_id, to_id, creation_date, text FROM Messages WHERE to_id=%s"
+            cursor.execute(sql, (user_id,))  # (user_id, ) - cause we need a tuple
+        else:
+            sql = "SELECT id, from_id, to_id,  creation_date, text FROM Messages"
+            cursor.execute(sql)
         messages = []
-        cursor.execute(sql)
         for row in cursor.fetchall():
             id_, from_id, to_id, creation_date, text = row
-            loaded_message = Message()
+            loaded_message = Message(from_id, to_id, text)
             loaded_message._id = id_
-            loaded_message._from_id = from_id
-            loaded_message._to_id = to_id
-            loaded_message.text = text
-            loaded_message.creation_date = creation_date
+            loaded_message._creation_date = creation_date
             messages.append(loaded_message)
         return messages
