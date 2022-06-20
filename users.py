@@ -20,7 +20,7 @@ args = parser.parse_args()
 
 
 def edit_user(cur, username, password, new_pass):
-    user = User.load_user_by_username(cursor, username)
+    user = User.load_user_by_username(cur, username)
     if not user:
         print("User does not exist!")
     elif check_password(password, user.hashed_password):
